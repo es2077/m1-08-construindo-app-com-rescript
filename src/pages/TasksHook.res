@@ -7,6 +7,7 @@ type hookResult = {
   isCreating: bool,
   result: requestResult,
   taskName: string,
+  toggleTaskStatus: TaskTypes.t => unit,
   handleChange: ReactEvent.Form.t => unit,
   handleCreateTask: ReactEvent.Mouse.t => unit,
 }
@@ -21,6 +22,23 @@ let handleFetch = _ => {
   Fetch.fetch(`${apiUrl}/tasks`, {"method": "GET"})
   ->then(response => Fetch.json(response))
   ->thenResolve(json => json->Jzon.decodeWith(apiCodec))
+}
+
+let handleUpdateTask = task => {
+  open Promise
+
+  let json = task->Jzon.encodeStringWith(TaskTypes.codec)
+
+  Fetch.fetch(
+    `${apiUrl}/tasks/${task.id->Js.Int.toString}`,
+    {
+      "method": "PUT",
+      "body": json,
+      "headers": {
+        "Content-Type": "application/json",
+      },
+    },
+  )->thenResolve(response => Js.log(response))
 }
 
 let handleCreateTask = (taskName: string) => {
@@ -54,13 +72,25 @@ let useTasks = () => {
     ),
   )
 
-  let handleSuccess = (_, _, _) => {
-    setTaskName(_ => "")
+  let refetchTasks = () =>
     result.refetch({
       throwOnError: false,
       cancelRefetch: false,
     })
+
+  let handleSuccess = (_, _, _) => {
+    setTaskName(_ => "")
+    refetchTasks()
   }
+
+  let {mutate: updateTaskMutation} = useMutation(
+    mutationOptions(
+      ~onSuccess=(_, _, _) => refetchTasks(),
+      ~mutationFn=handleUpdateTask,
+      ~mutationKey="update-task",
+      (),
+    ),
+  )
 
   let {mutate: createTaskMutation, isLoading} = useMutation(
     mutationOptions(
@@ -70,6 +100,17 @@ let useTasks = () => {
       (),
     ),
   )
+
+  let toggleTaskStatus = task => {
+    open TaskTypes
+
+    let updatedTask = {
+      ...task,
+      completed: !task.completed,
+    }
+
+    updateTaskMutation(. updatedTask, None)
+  }
 
   let handleCreateTask = _ => {
     createTaskMutation(. taskName, None)
@@ -84,6 +125,7 @@ let useTasks = () => {
   {
     isCreating: isLoading,
     taskName: taskName,
+    toggleTaskStatus: toggleTaskStatus,
     handleCreateTask: handleCreateTask,
     handleChange: handleChange,
     result: switch result {

@@ -74,7 +74,7 @@ module EmptyState = {
 
 module TaskItem = {
   @react.component
-  let make = (~name, ~createdAt, ~completed) => {
+  let make = (~name, ~onToggle, ~createdAt, ~completed) => {
     <Box
       mb=[xs(2)]
       px=[xs(3)]
@@ -103,7 +103,7 @@ module TaskItem = {
           {createdAt->s}
         </Typography>
       </Box>
-      <Checkbox checked=completed />
+      <Checkbox onChange={_ => onToggle()} checked=completed />
     </Box>
   }
 }
@@ -150,7 +150,7 @@ module NewTaskInput = {
 
 @react.component
 let make = () => {
-  let {result, isCreating, taskName, handleChange, handleCreateTask} = useTasks()
+  let {result, isCreating, taskName, toggleTaskStatus, handleChange, handleCreateTask} = useTasks()
 
   <Box display=[xs(#flex)] flexDirection=[xs(#column)] alignItems=[xs(#center)]>
     <Box display=[xs(#flex)] justifyContent=[xs(#center)] tag=#header>
@@ -169,8 +169,15 @@ let make = () => {
         | Error => <ErrorMessage />
         | Data([]) => <EmptyState />
         | Data(tasks) =>
-          tasks->map(({name, completed, createdAt}, key) => {
-            <TaskItem key name completed createdAt={createdAt->formatDate} />
+          tasks->map((task, key) => {
+            let {name, completed, createdAt} = task
+            <TaskItem
+              key
+              name
+              completed
+              onToggle={() => toggleTaskStatus(task)}
+              createdAt={createdAt->formatDate}
+            />
           })
         }}
       </Box>
